@@ -3,6 +3,7 @@ import os
 from PIL import Image
 import torch
 from datetime import datetime
+from PIL import ImageOps
 from utils import get_mask_and_background, paste_pipeline, get_mask_from_image, sd_inpainting, sd_img2img, sd_colorization, get_dataframe_row, paste_image, extract_object
 from utils import get_bike_colorization_prompt, get_bike_inpainting_prompt, get_car_colorization_prompt, get_car_inpainting_prompt, get_product_colorization_prompt, get_product_inpainting_prompt
 from utils import inpaint as bike_inpainting
@@ -24,8 +25,11 @@ def colorization(image: Image, colorization_model: str, upscaling_model: str, co
 # wrapper function for the main part of our algorithm
 def insert_diffusion(image: Image, mask: Image, prompt: str, negative_prompt: str, img2img_model: str, inpainting_model: str, img2img_strength: float, inpainting_steps: int, inpainting_guidance: float, img2img_guidance: float, background_image: Image=None, composition_strength: float=1) -> Image:
     # If no mask is provided, generate one from the image using thresholding
-    # if mask is None:
-    mask = get_mask_from_image(image, mask_threshold)
+    if mask is None:
+        mask = get_mask_from_image(image, mask_threshold)
+    else:
+        # flip the mask
+        mask = ImageOps.invert(mask)
     
     # if we have a background image we paste the foreground onto the background by turning white pixels transparent
     if background_image is not None:
