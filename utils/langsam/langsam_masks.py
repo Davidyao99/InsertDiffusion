@@ -59,5 +59,10 @@ def get_pasted_image(img: Image, prompt: str, erosion_strength: int):
     im_pasted = np.ones_like(im_array)*255
     # replace masked values to insert object onto background at original position
     im_pasted[mask] = im_array[mask]
-    return Image.fromarray(im_pasted)
     
+    # Create a binary mask image suitable for SD inpainting (255 where object is, 0 elsewhere)
+    binary_mask = np.zeros((im_array.shape[0], im_array.shape[1]), dtype=np.uint8)
+    binary_mask[mask] = 255
+    mask_img = Image.fromarray(binary_mask)
+    
+    return Image.fromarray(im_pasted), mask_img

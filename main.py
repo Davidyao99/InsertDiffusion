@@ -22,7 +22,9 @@ def colorization(image: Image, colorization_model: str, upscaling_model: str, co
     return colorized
 
 # wrapper function for the main part of our algorithm
-def insert_diffusion(image: Image, mask_threshold: int, prompt: str, negative_prompt: str, img2img_model: str, inpainting_model: str, img2img_strength: float, inpainting_steps: int, inpainting_guidance: float, img2img_guidance: float, background_image: Image=None, composition_strength: float=1) -> Image:
+def insert_diffusion(image: Image, mask: Image, prompt: str, negative_prompt: str, img2img_model: str, inpainting_model: str, img2img_strength: float, inpainting_steps: int, inpainting_guidance: float, img2img_guidance: float, background_image: Image=None, composition_strength: float=1) -> Image:
+    # If no mask is provided, generate one from the image using thresholding
+    # if mask is None:
     mask = get_mask_from_image(image, mask_threshold)
     
     # if we have a background image we paste the foreground onto the background by turning white pixels transparent
@@ -31,17 +33,18 @@ def insert_diffusion(image: Image, mask_threshold: int, prompt: str, negative_pr
 
     # perform masked inpainting
     inpainted = sd_inpainting(inpainting_model, image, mask, prompt, negative_prompt, inpainting_guidance, inpainting_steps, inpainting_strength=composition_strength)
+
     # perform rediffusion step
     result = sd_img2img(img2img_model, inpainted, prompt, negative_prompt, img2img_strength, img2img_guidance)
-    return result
+    return inpainted, result
 
 # wrapper function to extract an object with langSAM and paste it onto a white background of the same size as the original image
-def extract_wrapper(image: Image, object_desc: str, background: Image=None) -> Image:
+def extract_wrapper(image: Image, object_desc: str, background: Image=None) -> tuple:
     if background is None:
         background = image
     # extract the object using langSAM and insert it onto a white background of the same size as the background image
-    image = extract_object(image, background, object_desc)
-    return image
+    image, mask = extract_object(image, background, object_desc)
+    return image, mask
     
 if __name__ == '__main__':
     # -- CLI parameters --
@@ -138,8 +141,9 @@ if __name__ == '__main__':
         composition_strength = 1.
     
     # extract object from background using langSAM
+    object_mask = None  # Default value if no extraction happens
     if object_desc is not None:
-        image = extract_wrapper(image, object_desc, background_image)
+        image, object_mask = extract_wrapper(image, object_desc, background_image)
 
     # requirements for using/generating prompt
     prompt = args.background_prompt
@@ -219,14 +223,35 @@ if __name__ == '__main__':
     print()
 
     # scale and move object according to specification
-    image = paste_pipeline(image, scale, fraction_down, fraction_right, rotation=rotation)
-    
+    if object_mask is not None:
+        # If we have a mask, transform both image and mask together
+        image, object_mask = paste_pipeline(image, scale, fraction_down, fraction_right, rotation=rotation, mask=object_mask)
+    else:
+        image = paste_pipeline(image, scale, fraction_down, fraction_right, rotation=rotation)
+
     # do image colorization if necessary
     if colorize:
         image = colorization(image, colorization_model, upscaling_model, colorization_prompt, colorization_negative_prompt, fill_holes, dilation, colorization_strength, colorization_prompt_guidance)
+        # When we colorize the image, we need to regenerate the mask
+        object_mask = None
 
     # do InsertDiffusion
-    result = insert_diffusion(image, mask_threshold, prompt, negative_prompt, img2img_model, inpainting_model, img2img_strength, inpainting_steps, inpainting_guidance, img2img_guidance, background_image, composition_strength)
+    inpainted, result = insert_diffusion(
+        image, 
+        object_mask, 
+        prompt, 
+        negative_prompt, 
+        img2img_model, 
+        inpainting_model, 
+        img2img_strength, 
+        inpainting_steps, 
+        inpainting_guidance, 
+        img2img_guidance, 
+        background_image, 
+        composition_strength
+    )
     # save result to specified (or default) output folder while ensuring that the folder exists
-    os.makedirs(output_folder, exist_ok=True)
-    result.save(f'{output_folder}/{datetime.now().strftime("%d-%m-%Y--%H-%M-%S")}.png')
+    time = datetime.now().strftime("%d-%m-%Y--%H-%M-%S")
+    os.makedirs(os.path.join(output_folder, time), exist_ok=True)
+    result.save(f'{output_folder}/{time}/final.png')
+    inpainted.save(f'{output_folder}/{time}/inpainted.png')
