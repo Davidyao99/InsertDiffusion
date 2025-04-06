@@ -57,12 +57,17 @@ def get_colorization_pipeline(model_name="diffusers/stable-diffusion-xl-1.0-inpa
     return pipe
 
 # this method implements inpainting and masked img2img generation
-def sd_inpainting(model_name, image, mask_image, prompt=None, negative_prompt=None, prompt_guidance=7.5, total_steps=50, num_images: int=1, inpainting_strength: float=1):
+def sd_inpainting(model_name, image, mask_image, prompt=None, negative_prompt=None, prompt_guidance=7.5, total_steps=50, num_images: int=1, inpainting_strength: float=1, feather_amount: int=0):
     global inpainting_pipeline, inpainting_model_name
 
     # ensure correct data format
     image = image.convert("RGB")
     mask_image = mask_image.convert("RGB")
+    
+    # apply feathering to mask if requested
+    if feather_amount > 0:
+        from PIL import ImageFilter
+        mask_image = mask_image.filter(ImageFilter.GaussianBlur(radius=feather_amount))
 
     # load inpainting pipeline if changed or first run
     if inpainting_pipeline is None or inpainting_model_name != model_name:

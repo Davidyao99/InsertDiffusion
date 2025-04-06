@@ -23,7 +23,7 @@ def colorization(image: Image, colorization_model: str, upscaling_model: str, co
     return colorized
 
 # wrapper function for the main part of our algorithm
-def insert_diffusion(image: Image, mask: Image, prompt: str, negative_prompt: str, img2img_model: str, inpainting_model: str, img2img_strength: float, inpainting_steps: int, inpainting_guidance: float, img2img_guidance: float, background_image: Image=None, composition_strength: float=1) -> Image:
+def insert_diffusion(image: Image, mask: Image, prompt: str, negative_prompt: str, img2img_model: str, inpainting_model: str, img2img_strength: float, inpainting_steps: int, inpainting_guidance: float, img2img_guidance: float, background_image: Image=None, feather_amount: float=0, composition_strength: float=1) -> Image:
     # If no mask is provided, generate one from the image using thresholding
     if mask is None:
         mask = get_mask_from_image(image, mask_threshold)
@@ -36,10 +36,11 @@ def insert_diffusion(image: Image, mask: Image, prompt: str, negative_prompt: st
         image = paste_image(image, background_image)
 
     # perform masked inpainting
-    inpainted = sd_inpainting(inpainting_model, image, mask, prompt, negative_prompt, inpainting_guidance, inpainting_steps, inpainting_strength=composition_strength)
+    inpainted = sd_inpainting(inpainting_model, image, mask, prompt, negative_prompt, inpainting_guidance, inpainting_steps, feather_amount=feather_amount, inpainting_strength=composition_strength)
 
     # perform rediffusion step
     result = sd_img2img(img2img_model, inpainted, prompt, negative_prompt, img2img_strength, img2img_guidance)
+
     return inpainted, result
 
 # wrapper function to extract an object with langSAM and paste it onto a white background of the same size as the original image
@@ -252,10 +253,14 @@ if __name__ == '__main__':
         inpainting_guidance, 
         img2img_guidance, 
         background_image, 
-        composition_strength
+        composition_strength=composition_strength,
+        feather_amount=15.0
     )
     # save result to specified (or default) output folder while ensuring that the folder exists
     time = datetime.now().strftime("%d-%m-%Y--%H-%M-%S")
     os.makedirs(os.path.join(output_folder, time), exist_ok=True)
-    result.save(f'{output_folder}/{time}/final.png')
-    inpainted.save(f'{output_folder}/{time}/inpainted.png')
+
+    filename = "v3"
+
+    result.save(f'{output_folder}/{time}/final_{filename}.png')
+    inpainted.save(f'{output_folder}/{time}/inpainted_{filename}.png')
