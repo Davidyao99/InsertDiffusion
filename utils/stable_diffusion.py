@@ -69,6 +69,8 @@ def sd_inpainting(model_name, image, mask_image, prompt=None, negative_prompt=No
         from PIL import ImageFilter
         mask_image = mask_image.filter(ImageFilter.GaussianBlur(radius=feather_amount))
 
+    mask_image = ImageOps.invert(mask_image)
+
     # load inpainting pipeline if changed or first run
     if inpainting_pipeline is None or inpainting_model_name != model_name:
         inpainting_model_name = model_name

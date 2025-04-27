@@ -254,7 +254,7 @@ if __name__ == '__main__':
         img2img_guidance, 
         background_image, 
         composition_strength=composition_strength,
-        feather_amount=15.0
+        feather_amount=30.0
     )
     # save result to specified (or default) output folder while ensuring that the folder exists
     time = datetime.now().strftime("%d-%m-%Y--%H-%M-%S")
